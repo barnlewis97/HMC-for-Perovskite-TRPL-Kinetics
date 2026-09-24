@@ -15,7 +15,7 @@ from globalfit_functions import *
 
 # --- Configuration ---
 jax.config.update("jax_enable_x64", True)
-numpyro.set_host_device_count(20) 
+numpyro.set_host_device_count(3) 
 
 # --- 1. Load Data ---
 # Use the filename for your Stoi data here
@@ -26,14 +26,24 @@ try:
     data = np.load(filename)
     print(f"Loaded {filename} successfully.")
 except FileNotFoundError:
-    print(f"Could not find {filename}. Generating randomized dummy data.")
-    # FIX: Generate noisy data so standard deviation is NOT zero
-    data = np.ones((5, 100))
-    data[0] = np.logspace(-1, 2, 100) # Time
-    for i in range(1, 5):
-        # Add decay shape + noise so std() != 0
-        data[i] = np.exp(-data[0]) + np.random.normal(0, 0.01, 100)
+    print(f"Could not find {filename}.")
+    # stop the process
+    sys.exit(1)
 
+#Ask the user if they want to plot the raw data
+plot_raw = input("Do you want to plot the raw data? (y/n): ").strip().lower()
+if plot_raw == 'y':
+    plt.figure(figsize=(10, 6))
+    for i in range(1, len(data)):
+        plt.plot(data[0], data[i], label=f'Signal {i}')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Signal Intensity (a.u.)')
+    plt.title('Raw Stoi Decay Signals')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 # plt.plot(data[0], data[1], label='Signal 1')
 # plt.plot(data[0], data[2], label='Signal 2')
 # plt.plot(data[0], data[3], label='Signal 3')
@@ -158,13 +168,13 @@ key = PRNGKey(rndint)
 
 kernel = NUTS(model, target_accept_prob=accept_prob, max_tree_depth=8)
 
-warmups = 5000
-samples = 5000   
+warmups = 50
+samples = 50   
 mcmc = MCMC(
     kernel,
     num_warmup=warmups,
     num_samples=samples,
-    num_chains=10, # Set to desired chains
+    num_chains=3, # Set to desired chains
     progress_bar=True,
 )
 
