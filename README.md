@@ -18,11 +18,13 @@ This repository implements a **global fit** across multiple excitation fluences 
 
 ```
 .
-├── MCMC-Global-ExtendedModel-Yang_Stoi_Unified_nobkg_noAug.py   # Main MCMC fitting script
-├── globalfit_functions.py                                         # ODE models and TRPL signal functions
-├── Perovskite_TRPL_Data.npy                                                # Experimental TRPL data (stoichiometric sample)
-├── Thesis_HMC_BTD_Yang_Stoichiometric_5000WU_5000Sam_...ipynb    # Analysis & results notebook
-└── HMC_env.yml                                                    # Conda environment specification
+├── HMC_BTDModel.py              # Main MCMC fitting script (console prompts)
+├── HMC_BTDModel_GUI.py          # Same fit with a Tkinter GUI; also exports results to .xlsx
+├── globalfit_functions.py       # ODE models and TRPL signal functions
+├── Perovskite_TRPL_Data.npy     # Experimental TRPL data (stoichiometric sample)
+├── HMC_Analysis.ipynb           # Analysis & results notebook
+├── requirements.txt             # pip dependencies (pinned, tested on Linux)
+└── HMC_env.yml                  # Conda environment specification (Windows)
 ```
 
 ---
@@ -97,7 +99,7 @@ max_tree_depth     = 8
 Results are saved as a [NetCDF](https://docs.xarray.dev/en/stable/generated/xarray.Dataset.to_netcdf.html) file via [ArviZ](https://python.arviz.org/), including posterior samples and prior predictive samples:
 
 ```
-HMC_BTD_{num_chains}_WU{num_warmups}_SAM{num_samples}.nc
+<data file name>_BTD_chains{num_chains}_WU{num_warmups}_SAM{num_samples}.nc
 ```
 
 This file can be loaded for posterior analysis, trace plots, pair plots, and predictive checks using ArviZ.
@@ -125,20 +127,32 @@ git clone https://github.com/barnlewis97/HMC-for-Perovskite-TRPL-Kinetics.git
 cd HMC-for-Perovskite-TRPL-Kinetics
 ```
 
-### 2. Create the Conda environment
+### 2. Install the dependencies (pip, any platform)
+
+Requires Python 3.11 or later.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+`requirements.txt` pins the package versions used to produce the thesis results (JAX, NumPyro, Diffrax, Equinox, ArviZ and supporting libraries).
+
+> **Note:** `HMC_BTDModel_GUI.py` also needs `tkinter`, which is bundled with most Python installers but cannot be installed with pip. On Debian/Ubuntu: `sudo apt install python3-tk`.
+
+#### Alternative: Conda (Windows)
 
 ```bash
 conda env create -f HMC_env.yml
 conda activate MCMC_env
 ```
 
-The environment includes JAX (CPU), NumPyro, Diffrax, Equinox, ArviZ, and all dependencies. See `HMC_env.yml` for the full package list.
-
-> **Note:** The environment was built on Windows (prefix points to a Windows Anaconda installation). On Linux/macOS you may need to remove the `prefix:` line from `HMC_env.yml` before creating.
+`HMC_env.yml` was exported on Windows and pins Windows-specific builds, so use `requirements.txt` on Linux or macOS.
 
 ### 3. GPU / multi-device (optional)
 
-For GPU acceleration, install the appropriate `jaxlib` CUDA wheel separately after creating the environment. The script uses `numpyro.set_host_device_count(20)` for multi-chain parallelism on CPU; adjust this to match your hardware.
+For GPU acceleration, install the matching CUDA `jaxlib` wheel after installing the requirements (see the [JAX installation guide](https://docs.jax.dev/en/latest/installation.html)). On CPU, chains run in parallel across host devices: the script asks for the number of devices at start-up, so choose a value no greater than your number of CPU cores.
 
 ---
 
@@ -178,14 +192,18 @@ jupyter notebook "HMC_Analysis.ipynb"
 | [Diffrax](https://github.com/patrick-kidger/diffrax) | JAX-based ODE solver (Kvaerno5, adaptive stepping) |
 | [Equinox](https://github.com/patrick-kidger/equinox) | JAX neural network / pytree utilities |
 | [ArviZ](https://python.arviz.org/) | MCMC diagnostics and visualisation |
-| NumPy / SciPy | Data handling |
-| Matplotlib / Seaborn | Plotting |
+| h5netcdf / xarray | Saving results to NetCDF |
+| NumPy / SciPy / pandas | Data handling |
+| openpyxl | Excel export from the GUI |
+| Matplotlib / Seaborn / Plotly | Plotting |
+
+Exact versions are pinned in `requirements.txt`.
 
 ---
 
 ## Data Format
 
-`Perovskite_TRPL_data.npy` is a NumPy array of shape `(5, N_time)`:
+`Perovskite_TRPL_Data.npy` is a NumPy array of shape `(5, N_time)`:
 
 | Row | Content |
 |---|---|

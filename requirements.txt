@@ -1,0 +1,36 @@
+# Python dependencies for HMC-for-Perovskite-TRPL-Kinetics
+# Versions match the conda environment used for the thesis results (HMC_env.yml)
+# and have been tested with a clean pip install on Linux (Python 3.11).
+#
+# Install:  python -m venv .venv && source .venv/bin/activate
+#           pip install -r requirements.txt
+#
+# For GPU acceleration, install the matching CUDA jaxlib wheel afterwards
+# (see https://docs.jax.dev/en/latest/installation.html).
+
+# Core: forward model and inference
+jax==0.4.35
+jaxlib==0.4.35
+diffrax==0.6.1
+equinox==0.11.10
+numpyro==0.18.0
+numpy==2.3.1
+
+# Diagnostics and saving results (az.to_netcdf needs h5netcdf)
+arviz==0.21.0
+xarray==2025.4.0
+h5netcdf==1.2.0
+
+# Plotting and GUI data handling (the GUI writes results to .xlsx via openpyxl)
+matplotlib==3.10.0
+pandas==2.3.1
+openpyxl==3.1.5
+
+# Analysis notebook only
+scipy==1.16.0
+seaborn==0.13.2
+plotly==6.3.0
+ipykernel==6.29.5
+
+# Note: HMC_BTDModel_GUI.py also needs tkinter, which ships with most Python
+# installers but not with pip. On Debian/Ubuntu: sudo apt install python3-tk
