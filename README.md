@@ -20,7 +20,7 @@ This repository implements a **global fit** across multiple excitation fluences 
 .
 ├── MCMC-Global-ExtendedModel-Yang_Stoi_Unified_nobkg_noAug.py   # Main MCMC fitting script
 ├── globalfit_functions.py                                         # ODE models and TRPL signal functions
-├── Stoi_Decays.npy                                                # Experimental TRPL data (stoichiometric sample)
+├── Perovskite_TRPL_Data.npy                                                # Experimental TRPL data (stoichiometric sample)
 ├── Thesis_HMC_BTD_Yang_Stoichiometric_5000WU_5000Sam_...ipynb    # Analysis & results notebook
 └── HMC_env.yml                                                    # Conda environment specification
 ```
@@ -55,7 +55,7 @@ All models output the log₁₀ TRPL signal (proportional to `n × p × k_rad`),
 
 ### Data pipeline
 
-1. Load TRPL decay data from `Stoi_Decays.npy` — shape `(5, N_time)`: one time axis and four signal channels at different fluences.
+1. Load TRPL decay data from `Perovskite_TRPL_Data.npy` — shape `(5, N_time)`: one time axis and four signal channels at different fluences.
 2. Divide each channel by its t=0 value, apply log₁₀, then standardise globally (zero mean, unit variance).
 
 ### Priors
@@ -97,7 +97,7 @@ max_tree_depth     = 8
 Results are saved as a [NetCDF](https://docs.xarray.dev/en/stable/generated/xarray.Dataset.to_netcdf.html) file via [ArviZ](https://python.arviz.org/), including posterior samples and prior predictive samples:
 
 ```
-BTD_Yang_Stoichiometric_WU5000_SAM5000_nobkg_noAug_final.nc
+HMC_BTD_{num_chains}_WU{num_warmups}_SAM{num_samples}.nc
 ```
 
 This file can be loaded for posterior analysis, trace plots, pair plots, and predictive checks using ArviZ.
@@ -106,7 +106,7 @@ This file can be loaded for posterior analysis, trace plots, pair plots, and pre
 
 ## Analysis Notebook
 
-`Thesis_HMC_BTD_Yang_Stoichiometric_5000WU_5000Sam_nobkg_noAug_FINAL.ipynb` contains:
+`HMC_Analysis.ipynb` contains:
 
 - Loading and visualising the posterior from the saved NetCDF
 - Trace plots and R-hat convergence diagnostics
@@ -147,13 +147,13 @@ For GPU acceleration, install the appropriate `jaxlib` CUDA wheel separately aft
 ### Run the MCMC fit
 
 ```bash
-python MCMC-Global-ExtendedModel-Yang_Stoi_Unified_nobkg_noAug.py
+python HMC_BTDModel.py
 ```
 
 This will:
-1. Load `Stoi_Decays.npy`
+1. Load `Perovskite_TRPL_Data.npy` or any .npy file in the format of 0th dimension = time and dimensions >0 = signals.
 2. Pre-process and standardise the data
-3. Run 10 parallel MCMC chains (5000 warmup + 5000 samples each)
+3. Run parallel MCMC chains (with definied number of warmup + samples each)
 4. Print a summary table with R-hat and ESS diagnostics
 5. Save the InferenceData object to a `.nc` file
 
@@ -164,7 +164,7 @@ Expected runtime depends heavily on hardware. On a modern multi-core CPU, expect
 Open the notebook:
 
 ```bash
-jupyter notebook "Thesis_HMC_BTD_Yang_Stoichiometric_5000WU_5000Sam_nobkg_noAug_FINAL.ipynb"
+jupyter notebook "HMC_Analysis.ipynb"
 ```
 
 ---
@@ -185,7 +185,7 @@ jupyter notebook "Thesis_HMC_BTD_Yang_Stoichiometric_5000WU_5000Sam_nobkg_noAug_
 
 ## Data Format
 
-`Stoi_Decays.npy` is a NumPy array of shape `(5, N_time)`:
+`Perovskite_TRPL_data.npy` is a NumPy array of shape `(5, N_time)`:
 
 | Row | Content |
 |---|---|
