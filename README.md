@@ -121,8 +121,8 @@ This file can be loaded for posterior analysis, trace plots, pair plots, and pre
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/barnlewis97/HMC-for-Perovskite-TRPL-Kinetics.git
+cd HMC-for-Perovskite-TRPL-Kinetics
 ```
 
 ### 2. Create the Conda environment
