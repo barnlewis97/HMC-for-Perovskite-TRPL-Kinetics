@@ -119,7 +119,7 @@ if plot_standardised == 'y':
     plt.grid(True)
     plt.show()
 # --- 3. JIT Compile Functions ---
-runner = jit(TRPL_BTD)
+runner = jit(TRPL_ABC)
 
 # --- 4. Bayesian Model ---
 def model(time_in, ydata=None):
@@ -141,21 +141,21 @@ def model(time_in, ydata=None):
     )
     current_n0s = 10**(N0s_log * fac) # Shape (4,)
 
-    # Physics Parameters (Theta)
-    # Order: kt, kb, kdt, kdp, NT, bkg
-    # FIX: Tightened 'bkg' lower bound from -20 to -10. 
-    # 10^-20 is too small for double precision solvers and causes crashes.
+    # Physics Parameters (Theta), sampled in log10 space
+    # Order: k_A, k_B, k_C
+    # Held at zero: bkg
     theta = numpyro.sample(
         "theta",
         TruncatedNormal(
-            low   = jnp.array([-18.50, -21.00, -6.5, -21.5, 14]), 
-            high  = jnp.array([-16.00, -17.0, -1.0, -17.00, 17.0]),
-            loc   = jnp.array([-17.00, -20.00, -4.00, -19.00, 14.5]),
-            scale = jnp.array([theta_stddev, theta_stddev, theta_stddev, theta_stddev, theta_stddev])
+            low   = jnp.array([-5.00, -21.00, -40.00]),
+            high  = jnp.array([0.00, -17.00, -34.00]),
+            loc   = jnp.array([-2.00, -20.00, -37.00]),
+            scale = theta_stddev * jnp.ones(3),
         ),
     )
-    
-    kt, kb, kdt, kdp, NT = theta[0], theta[1], theta[2], theta[3], theta[4]
+
+    k_A, k_B, k_C = 10**theta
+    bkg = 0.0
 
 
     # Noise Prior (Shape: 4)
@@ -171,8 +171,7 @@ def model(time_in, ydata=None):
 
     # --- Vectorized Solver ---
     def get_signal_trace(n0_val):
-        # Calls TRPL_BTD
-        raw_output = runner(time_in, 0, 10**kt, 10**kb, 10**kdt, 10**kdp, 10**NT, 0, n0_val, 0)[0]
+        raw_output = runner(time_in, n0_val, k_A, k_B, k_C, bkg)[0]
         
         # Normalize to t=0 (log scale)
         sig = raw_output - raw_output[0] 
@@ -202,7 +201,7 @@ mcmc = MCMC(
     progress_bar=True,
 )
 
-print("Starting MCMC (BTD Model)...")
+print("Starting MCMC (ABC Model)...")
 mcmc.run(key, time_in=time_axis, ydata=ydata_jax)
 mcmc.print_summary()
 
@@ -225,6 +224,6 @@ idata = az.from_numpyro(
 )
 
 # 3. Save to NetCDF
-filename = f"{filename[:-4]}_BTD_chains{num_devices}_WU{warmups}_SAM{samples}.nc"
+filename = f"{filename[:-4]}_ABC_chains{num_devices}_WU{warmups}_SAM{samples}.nc"
 az.to_netcdf(idata, filename)
 print(f"Saved netcdf with priors to {filename}")

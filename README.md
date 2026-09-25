@@ -18,12 +18,17 @@ This repository implements a **global fit** across multiple excitation fluences 
 
 ```
 .
-├── MCMC-Global-ExtendedModel-Yang_Stoi_Unified_nobkg_noAug.py   # Main MCMC fitting script
-├── globalfit_functions.py                                         # ODE models and TRPL signal functions
-├── Stoi_Decays.npy                                                # Experimental TRPL data (stoichiometric sample)
-├── Thesis_HMC_BTD_Yang_Stoichiometric_5000WU_5000Sam_...ipynb    # Analysis & results notebook
-└── HMC_env.yml                                                    # Conda environment specification
+├── MCMC-Global-BTDModel-Yang_Stoi_Unified_nobkg_noAug.py   # Original BTD MCMC fitting script
+├── HMC_<Name>Model.py                                      # Console HMC fit for one model (prompts for settings)
+├── HMC_<Name>Model_GUI.py                                  # Tk GUI HMC fit for one model (priors editable)
+├── HMC_BTDModel_GUI.py                                     # GUI with a model selector (BTD, DT, DTShallowVar, DTDeepVar, ShallowTrapVar)
+├── globalfit_functions.py                                  # ODE models and TRPL signal functions
+├── Perovskite_TRPL_Data.npy                                # Example TRPL data
+├── HMC_Analysis.ipynb                                      # Analysis & results notebook
+└── HMC_env.yml                                             # Conda environment specification
 ```
+
+`<Name>` is one of `ABC`, `BTD`, `DT`, `DTShallowVar`, `DTDeepVar` or `ShallowTrapVar`.
 
 ---
 
@@ -33,29 +38,33 @@ Several charge carrier recombination models are implemented, all solved as syste
 
 | Model | State Variables | Key Physics |
 |---|---|---|
-| `Full_REM_Model` | n, p, n_t1, n_t2 | Radiative + two traps (full SRH) |
-| `DualTrap_Model` | n, p, n_t1, n_t2 | Dual trap, simplified |
-| `DualTrap_Model_v2` | n, n_t1 | Charge neutrality approximation |
-| `DTDeepVar_Model` | n, n_t1 | Deep trap with variable density |
-| `Manuel_Model` | n, n_t (trapped) | Single trap + Auger |
-| `ShallowTrapVariable_Model` | n, n_t | Shallow trap, variable density |
-| **`Extended_Model`** (active) | n, n_t | Trap + radiative + deep trap |
+| `ABC` (`TRPL_ABC`, `TRPL_AB`) | n | First-order trapping, bimolecular and Auger recombination |
+| **`BTD`** (active, `TRPL_BTD`) | n_e, n_t, n_h | Bimolecular, trapping, detrapping and depopulation with Auger |
+| `DT` (`TRPL_DT`) | n, n_t | Dual trap: shallow trap with detrapping + deep non-radiative trap (DOI: 10.1103/PRXEnergy.4.013001) |
+| `DTShallowVar` (`TRPL_DTShallowVar`) | n, n_t1 | Dual trap; shallow (detrapping-active) trap has variable density (N_T - n_T) |
+| `DTDeepVar` (`TRPL_DTDeepVar`) | n, n_t1, n_t2, p | Dual trap; deep (depopulation-active) trap has variable density (N_T - n_T) |
+| `ShallowTrapVar` (`TRPL_ShallowTrapVar`) | n, n_t | Single shallow trap with variable density + Auger |
+| `FullREM` (rate equations only) | n, p, n_t1, n_t2 | Full two-trap SRH |
 
-The **Extended Model** (`TRPL_Extended_Model`) is used in the main fitting script and includes:
+Each model has a `<Name>_Model` rate-equation function, a `solve_<Name>` solver and a `TRPL_<Name>` signal function. `TRPL_<Name>` returns `(log10 signal, carrier densities...)`, so the fitting scripts take element `[0]`.
+
+The **BTD Model** (`TRPL_BTD`) is used in the main fitting script and includes:
 - Radiative bimolecular recombination (rate `k_b`)
 - Trap-mediated (SRH-like) non-radiative recombination (rate `k_t`)
 - Deep trap non-radiative channel (rate `k_dt`)
 - Trap density `N_T` and shallow trap emission `k_dp`
 
-All models output the log₁₀ TRPL signal (proportional to `n × p × k_rad`), normalised to the initial value.
+All models output the log₁₀ TRPL signal (proportional to `n × p`), normalised to the initial value, with a background `bkg` added.
+
+The same `globalfit_functions.py` is used by the companion simulation repository [Perovskite-TRPL-Kinetics-Simulations](https://github.com/barnlewis97/Perovskite-TRPL-Kinetics-Simulations).
 
 ---
 
-## Bayesian Model & MCMC (`MCMC-Global-ExtendedModel-Yang_Stoi_Unified_nobkg_noAug.py`)
+## Bayesian Model & MCMC (`MCMC-Global-BTDModel-Yang_Stoi_Unified_nobkg_noAug.py`)
 
 ### Data pipeline
 
-1. Load TRPL decay data from `Stoi_Decays.npy` — shape `(5, N_time)`: one time axis and four signal channels at different fluences.
+1. Load TRPL decay data from a `.npy` file — shape `(5, N_time)`: one time axis and four signal channels at different fluences. The original script expects `Stoi_Decays.npy` (not included); the `HMC_<Name>` scripts default to the example `Perovskite_TRPL_Data.npy`.
 2. Divide each channel by its t=0 value, apply log₁₀, then standardise globally (zero mean, unit variance).
 
 ### Priors
@@ -106,7 +115,7 @@ This file can be loaded for posterior analysis, trace plots, pair plots, and pre
 
 ## Analysis Notebook
 
-`Thesis_HMC_BTD_Yang_Stoichiometric_5000WU_5000Sam_nobkg_noAug_FINAL.ipynb` contains:
+`HMC_Analysis.ipynb` contains:
 
 - Loading and visualising the posterior from the saved NetCDF
 - Trace plots and R-hat convergence diagnostics
@@ -121,8 +130,8 @@ This file can be loaded for posterior analysis, trace plots, pair plots, and pre
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/barnlewis97/HMC-for-Perovskite-TRPL-Kinetics.git
+cd HMC-for-Perovskite-TRPL-Kinetics
 ```
 
 ### 2. Create the Conda environment
@@ -147,11 +156,11 @@ For GPU acceleration, install the appropriate `jaxlib` CUDA wheel separately aft
 ### Run the MCMC fit
 
 ```bash
-python MCMC-Global-ExtendedModel-Yang_Stoi_Unified_nobkg_noAug.py
+python MCMC-Global-BTDModel-Yang_Stoi_Unified_nobkg_noAug.py
 ```
 
 This will:
-1. Load `Stoi_Decays.npy`
+1. Load `Stoi_Decays.npy` (edit `filename` in the script to use your own data)
 2. Pre-process and standardise the data
 3. Run 10 parallel MCMC chains (5000 warmup + 5000 samples each)
 4. Print a summary table with R-hat and ESS diagnostics
@@ -159,12 +168,25 @@ This will:
 
 Expected runtime depends heavily on hardware. On a modern multi-core CPU, expect several hours for 10 chains × 10,000 total steps with the stiff ODE solver.
 
+### Fit other models
+
+Each model has a console script and a GUI script:
+
+```bash
+python HMC_DTDeepVarModel.py        # prompts for chains, samples, seed, acceptance probability, prior width
+python HMC_DTDeepVarModel_GUI.py    # opens a window for the data file, sampler settings and priors
+```
+
+Priors are in log₁₀ space with units of cm and ns, matched to the BTD parameter with the same role (e.g. bimolecular constants use the `kb` range). Auger constants, `p0` and `bkg` are held at zero by default; in the GUI you can tick them to fit them. The GUI writes a `.nc` file and an `.xlsx` summary named after the data file and model.
+
+A failed ODE solve for an extreme parameter draw returns NaN (via `EQX_ON_ERROR=nan`, set in `globalfit_functions.py`), so NUTS rejects that step instead of the run crashing.
+
 ### Analyse results
 
 Open the notebook:
 
 ```bash
-jupyter notebook "Thesis_HMC_BTD_Yang_Stoichiometric_5000WU_5000Sam_nobkg_noAug_FINAL.ipynb"
+jupyter notebook HMC_Analysis.ipynb
 ```
 
 ---
@@ -180,12 +202,14 @@ jupyter notebook "Thesis_HMC_BTD_Yang_Stoichiometric_5000WU_5000Sam_nobkg_noAug_
 | [ArviZ](https://python.arviz.org/) | MCMC diagnostics and visualisation |
 | NumPy / SciPy | Data handling |
 | Matplotlib / Seaborn | Plotting |
+| pandas / openpyxl | GUI `.xlsx` summaries |
+| tkinter | GUI scripts (ships with most Python installers) |
 
 ---
 
 ## Data Format
 
-`Stoi_Decays.npy` is a NumPy array of shape `(5, N_time)`:
+Input data (e.g. `Perovskite_TRPL_Data.npy`) is a NumPy array of shape `(5, N_time)`:
 
 | Row | Content |
 |---|---|
