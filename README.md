@@ -19,9 +19,8 @@ This repository implements a **global fit** across multiple excitation fluences 
 ```
 .
 ├── MCMC-Global-BTDModel-Yang_Stoi_Unified_nobkg_noAug.py   # Original BTD MCMC fitting script
+├── HMC_GUI.py                                              # GUI: choose any model, sampler settings and priors
 ├── HMC_<Name>Model.py                                      # Console HMC fit for one model (prompts for settings)
-├── HMC_<Name>Model_GUI.py                                  # Tk GUI HMC fit for one model (priors editable)
-├── HMC_BTDModel_GUI.py                                     # GUI with a model selector (BTD, DT, DTShallowVar, DTDeepVar, ShallowTrapVar)
 ├── globalfit_functions.py                                  # ODE models and TRPL signal functions
 ├── Perovskite_TRPL_Data.npy                                # Example TRPL data
 ├── HMC_Analysis.ipynb                                      # Analysis & results notebook
@@ -168,16 +167,46 @@ This will:
 
 Expected runtime depends heavily on hardware. On a modern multi-core CPU, expect several hours for 10 chains × 10,000 total steps with the stiff ODE solver.
 
-### Fit other models
+### Fit any model with the GUI
 
-Each model has a console script and a GUI script:
+```bash
+python HMC_GUI.py
+```
+
+The window lets you pick the data file, the model (`ABC`, `BTD`, `DT`, `DTShallowVar`, `DTDeepVar` or `ShallowTrapVar`), the sampler settings, the nominal initial carrier densities and, for each parameter, whether to fit it and its prior bounds. Priors are in log₁₀ space with units of cm and ns, matched to the BTD parameter with the same role (e.g. bimolecular constants use the `kb` range). Auger constants, `p0` and `bkg` are unticked by default; unticked parameters are not sampled and are held at zero.
+
+Results are written next to the data file as `<data>_<Model>_chains<C>_WU<W>_SAM<S>.nc` and `.xlsx`.
+
+**NetCDF** (ArviZ `InferenceData`, open with `az.from_netcdf`):
+
+| Group | Contents |
+|---|---|
+| `posterior` | One variable per fitted parameter (log₁₀), `fac` and `noise` per decay, and `fit` (noise-free standardised model curves) |
+| `posterior.attrs` | Model, data file, sampler settings, runtime, divergences, fitted/fixed parameters and the full prior table (`parameters`, JSON) |
+| `prior`, `prior_predictive` | 500 draws from the prior |
+| `posterior_predictive` | Simulated observations from the posterior |
+| `log_likelihood` | Pointwise log-likelihood (for `az.loo` / `az.compare`) |
+| `sample_stats` | Divergences, acceptance rate, tree depth, leapfrog steps, energy |
+| `observed_data` | The standardised log₁₀ decays that were fitted |
+| `constant_data` | Raw decays and nominal N₀ values |
+
+**Excel**:
+
+| Sheet | Contents |
+|---|---|
+| `settings` | Model, data file, sampler settings, runtime, divergences, priors |
+| `summary` | Per parameter: units, fitted/fixed, prior bounds and sample mean/mode, posterior mean/sd/median/mode, 94% HDI, linear-scale values, MCSE, ESS (bulk/tail), R-hat |
+| `prior_samples`, `posterior_samples` | Every draw, with chain and draw columns |
+| `sample_stats` | Per chain: divergences, mean acceptance rate, leapfrog steps, BFMI |
+| `fit` | Data vs posterior mean fit and 94% HDI for each decay, as log₁₀(PL/PL₀) |
+
+### Fit a model from the console
 
 ```bash
 python HMC_DTDeepVarModel.py        # prompts for chains, samples, seed, acceptance probability, prior width
-python HMC_DTDeepVarModel_GUI.py    # opens a window for the data file, sampler settings and priors
 ```
 
-Priors are in log₁₀ space with units of cm and ns, matched to the BTD parameter with the same role (e.g. bimolecular constants use the `kb` range). Auger constants, `p0` and `bkg` are held at zero by default; in the GUI you can tick them to fit them. The GUI writes a `.nc` file and an `.xlsx` summary named after the data file and model.
+There is one console script per model (`HMC_<Name>Model.py`). They save only the `.nc` file.
 
 A failed ODE solve for an extreme parameter draw returns NaN (via `EQX_ON_ERROR=nan`, set in `globalfit_functions.py`), so NUTS rejects that step instead of the run crashing.
 
@@ -203,7 +232,7 @@ jupyter notebook HMC_Analysis.ipynb
 | NumPy / SciPy | Data handling |
 | Matplotlib / Seaborn | Plotting |
 | pandas / openpyxl | GUI `.xlsx` summaries |
-| tkinter | GUI scripts (ships with most Python installers) |
+| tkinter | `HMC_GUI.py` (ships with most Python installers) |
 
 ---
 
