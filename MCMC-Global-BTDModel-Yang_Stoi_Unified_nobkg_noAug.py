@@ -9,49 +9,24 @@ from jax import jit
 from jax.random import PRNGKey
 from numpyro.infer import MCMC, NUTS, Predictive
 from numpyro.distributions import TruncatedNormal, Normal
-import os
 
 # Import your custom physics models
 from globalfit_functions import *
 
 # --- Configuration ---
-
-# Ask for inputs BEFORE JAX initializes
-num_devices_input = input("Enter the number of devices for parallel chains (default is 4): ").strip()
-num_devices = int(num_devices_input) if num_devices_input else 4
-
-num_samples_input = input("Enter the number of samples for MCMC (default is 1000): ").strip()
-num_samples = int(num_samples_input) if num_samples_input else 1000
-
-print(f"Configuration: num_devices={num_devices}, num_samples={num_samples}")
-rndint      = int(input("Choose a random integer: ").strip())
-accept_prob = float(input('Choose and acceptance probability (between 0.7 and 0.99): '.strip()))
-if accept_prob < 0.7 or accept_prob > 0.99:
-    print("Warning: Acceptance probability should be between 0.7 and 0.99 for stable sampling, resetting to 0.85.")
-    accept_prob = 0.85
-theta_stddev = float(input('Choose a theta stddev: '.strip()))
-
-#Tell NumPyro/JAX how many CPU host devices to create
-
-numpyro.set_host_device_count(num_devices)
-
-# Import JAX and set configurations
-
 jax.config.update("jax_enable_x64", True)
-
-# Now JAX will recognise the requested number of devices
-num_devices_available = jax.device_count()
-print(f"Number of available devices for parallel chains: {num_devices_available}")
+numpyro.set_host_device_count(3) 
 
 # --- 1. Load Data ---
 # Use the filename for your Stoi data here
-filename = r'Perovskite_TRPL_Data.npy' 
+filename = r'Stoi_Decays.npy' 
+
 
 try:
     data = np.load(filename)
     print(f"Loaded {filename} successfully.")
 except FileNotFoundError:
-    print(f"COULD NOT FIND {filename} - ENSURE THE FILENAME IS CORRECT AND THE FILE IS IN THE CURRENT DIRECTORY.")
+    print(f"Could not find {filename}.")
     # stop the process
     sys.exit(1)
 
@@ -69,6 +44,13 @@ if plot_raw == 'y':
     plt.legend()
     plt.grid(True)
     plt.show()
+# plt.plot(data[0], data[1], label='Signal 1')
+# plt.plot(data[0], data[2], label='Signal 2')
+# plt.plot(data[0], data[3], label='Signal 3')
+# plt.plot(data[0], data[4], label='Signal 4')
+# plt.xscale('log')
+# plt.yscale('log')
+# plt.show()
 
 
 # data[0] is time, data[1..4] are signals
@@ -76,7 +58,7 @@ time_axis = data[0]
 
 # Extract Signals, Log Transform, and Normalize to t=0
 raw_signals = []
-for i in range(1, len(data)):
+for i in range(1, 5):
     # Log10 and normalize by the first point (t=0)
     # Added safety epsilon just in case
     val = data[i] / data[i][0]
@@ -101,23 +83,15 @@ print(f"Global Stats - Mean: {global_mean:.4f}, Std: {global_std:.4f}")
 # Standardise
 ydata_standardised = (raw_signals - global_mean) / global_std
 ydata_jax = jnp.array(ydata_standardised)
-
+# plt.plot(time_axis, ydata_jax[0], label='Standardised Signal 1')
+# plt.plot(time_axis, ydata_jax[1], label='Standardised Signal 2')
+# plt.plot(time_axis, ydata_jax[2], label='Standardised Signal 3')
+# plt.plot(time_axis, ydata_jax[3], label='Standardised Signal 4')
+# plt.show()
+# FIX: Fail fast if NaNs were created
 if jnp.isnan(ydata_jax).any():
     raise ValueError("Critical Error: ydata_jax contains NaNs. Check your data file or log transforms.")
 
-#Ask user if they want to plot the standardised data
-plot_standardised = input("Do you want to plot the standardised data? (y/n): ").strip().lower()
-if plot_standardised == 'y':
-    plt.figure(figsize=(10, 6))
-    for i in range(ydata_jax.shape[0]):
-        plt.plot(time_axis, ydata_jax[i], label=f'Standardised Signal {i+1}')
-    plt.xscale('log')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Standardised Signal Intensity (a.u.)')
-    plt.title('Standardised Stoi Decay Signals')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
 # --- 3. JIT Compile Functions ---
 runner = jit(TRPL_BTD)
 
@@ -151,7 +125,7 @@ def model(time_in, ydata=None):
             low   = jnp.array([-18.50, -21.00, -6.5, -21.5, 14]), 
             high  = jnp.array([-16.00, -17.0, -1.0, -17.00, 17.0]),
             loc   = jnp.array([-17.00, -20.00, -4.00, -19.00, 14.5]),
-            scale = jnp.array([theta_stddev, theta_stddev, theta_stddev, theta_stddev, theta_stddev])
+            scale = jnp.array([0.5, 0.5, 0.5, 0.5, 0.5])
         ),
     )
     
@@ -188,17 +162,19 @@ def model(time_in, ydata=None):
 
 
 # --- 5. Run MCMC ---
+rndint      = 3 
+accept_prob = 0.85
 key = PRNGKey(rndint)
 
 kernel = NUTS(model, target_accept_prob=accept_prob, max_tree_depth=8)
 
-warmups = num_samples
-samples = num_samples   
+warmups = 50
+samples = 50   
 mcmc = MCMC(
     kernel,
     num_warmup=warmups,
     num_samples=samples,
-    num_chains=num_devices, 
+    num_chains=3, # Set to desired chains
     progress_bar=True,
 )
 
@@ -225,6 +201,6 @@ idata = az.from_numpyro(
 )
 
 # 3. Save to NetCDF
-filename = f"{filename[:-4]}_BTD_chains{num_devices}_WU{warmups}_SAM{samples}.nc"
+filename = f"BTD_Yang_Stoichiometric_WU{warmups}_SAM{samples}_nobkg_noAug_final.nc"
 az.to_netcdf(idata, filename)
 print(f"Saved netcdf with priors to {filename}")
